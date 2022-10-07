@@ -3,7 +3,7 @@ import { Observable, of } from 'rxjs';
 
 @Injectable()
 export class DashboardService {
-    constructor() {}
+    constructor() { }
 
     getDashboard$(): Observable<{}> {
         return of({});

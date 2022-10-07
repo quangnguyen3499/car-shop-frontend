@@ -1,14 +1,14 @@
+import { HttpClient } from '@angular/common/http';
 import { DecimalPipe } from '@angular/common';
 import { Injectable, PipeTransform } from '@angular/core';
-import { COUNTRIES } from '@modules/tables/data/countries';
 import { SortDirection } from '@modules/tables/directives';
-import { Country } from '@modules/tables/models';
+import { Country, Car } from '@modules/tables/models';
 import { BehaviorSubject, Observable, of, Subject } from 'rxjs';
 import { debounceTime, delay, switchMap, tap } from 'rxjs/operators';
 
 interface SearchResult {
-    countries: Country[];
     total: number;
+    cars: Car[] | null;
 }
 
 interface State {
@@ -23,31 +23,30 @@ function compare(v1: number | string, v2: number | string) {
     return v1 < v2 ? -1 : v1 > v2 ? 1 : 0;
 }
 
-function sort(countries: Country[], column: string, direction: string): Country[] {
+function sort(cars: Car[] | null, column: string, direction: string): Car[] | null{
     if (direction === '') {
-        return countries;
+        return cars;
     } else {
-        return [...countries].sort((a, b) => {
+        return [...cars].sort((a, b) => {
             const res = compare(a[column], b[column]);
             return direction === 'asc' ? res : -res;
         });
     }
 }
 
-function matches(country: Country, term: string, pipe: PipeTransform) {
+function matches(car: Car, term: string, pipe: PipeTransform) {
     return (
-        country.name.toLowerCase().includes(term.toLowerCase()) ||
-        pipe.transform(country.area).includes(term) ||
-        pipe.transform(country.population).includes(term)
+        car.name.toLowerCase().includes(term.toLowerCase())
     );
 }
+
 
 @Injectable({ providedIn: 'root' })
 export class CountryService {
     private _loading$ = new BehaviorSubject<boolean>(true);
     private _search$ = new Subject<void>();
-    private _countries$ = new BehaviorSubject<Country[]>([]);
     private _total$ = new BehaviorSubject<number>(0);
+    private _cars$ = new BehaviorSubject<Car[] | null>([]);
 
     private _state: State = {
         page: 1,
@@ -57,7 +56,7 @@ export class CountryService {
         sortDirection: '',
     };
 
-    constructor(private pipe: DecimalPipe) {
+    constructor(private pipe: DecimalPipe, private http: HttpClient) {
         this._search$
             .pipe(
                 tap(() => this._loading$.next(true)),
@@ -67,15 +66,15 @@ export class CountryService {
                 tap(() => this._loading$.next(false))
             )
             .subscribe(result => {
-                this._countries$.next(result.countries);
+                this._cars$.next(result.cars);
                 this._total$.next(result.total);
             });
 
         this._search$.next();
     }
 
-    get countries$() {
-        return this._countries$.asObservable();
+    get car$() {
+        return this._cars$.asObservable();
     }
     get total$() {
         return this._total$.asObservable();
@@ -113,18 +112,37 @@ export class CountryService {
         this._search$.next();
     }
 
+    // private _search(): Observable<SearchResult> {
+    //     const { sortColumn, sortDirection, pageSize, page, searchTerm } = this._state;
+
+    //     // 1. sort
+    //     let countries = sort(COUNTRIES, sortColumn, sortDirection);
+
+    //     // 2. filter
+    //     countries = countries.filter(country => matches(country, searchTerm, this.pipe));
+    //     const total = countries.length;
+
+    //     // 3. paginate
+    //     countries = countries.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
+    //     return of({ countries, total });
+    // }
+    
     private _search(): Observable<SearchResult> {
         const { sortColumn, sortDirection, pageSize, page, searchTerm } = this._state;
+        const url_cars = "http://localhost:8000/api/v1/cars"
+        var data: Car[] | null;
 
-        // 1. sort
-        let countries = sort(COUNTRIES, sortColumn, sortDirection);
-
+        this.http.get<Car[] | null>(url_cars, { observe: 'response'})
+            .subscribe(response => { 
+                data = sort(response.body, sortColumn, sortDirection)
+            });
+        
         // 2. filter
-        countries = countries.filter(country => matches(country, searchTerm, this.pipe));
-        const total = countries.length;
+        cars = cars.filter(car => matches(car, searchTerm, this.pipe));
+        const total = car_set.length;
 
         // 3. paginate
-        countries = countries.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
-        return of({ countries, total });
+        data = car_set.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
+        return of({ data, total });
     }
 }
