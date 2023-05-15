@@ -1,2 +1,1 @@
-npm install
-npm start
+### Car shop frontend written in Angular
